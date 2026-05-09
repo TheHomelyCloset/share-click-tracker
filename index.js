@@ -5,50 +5,33 @@ app.use(cors());
 app.use(express.json());
 
 const SHOPIFY_STORE = 'thehomelycloset.myshopify.com';
-const CLIENT_ID = process.env.CLIENT_ID;
-const CLIENT_SECRET = process.env.CLIENT_SECRET;
-
-async function getAccessToken() {
-  const res = await fetch(`https://${SHOPIFY_STORE}/admin/oauth/access_token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      grant_type: 'client_credentials'
-    })
-  });
-  const data = await res.json();
-  return data.access_token;
-}
+const SHOPIFY_TOKEN = process.env.SHOPIFY_TOKEN;
 
 app.post('/track-share', async (req, res) => {
   const { platform, product_id, product_title, timestamp } = req.body;
   if (!platform || !product_id) return res.status(400).json({ error: 'Missing fields' });
 
   try {
-    const token = await getAccessToken();
-    const query = `
-      mutation {
-        metaobjectCreate(metaobject: {
-          type: "sidekick_share_click_event"
-          fields: [
-            { key: "platform", value: "${platform}" }
-            { key: "product_id", value: "${product_id}" }
-            { key: "product_title", value: "${product_title}" }
-            { key: "timestamp", value: "${timestamp}" }
-          ]
-        }) {
-          metaobject { id }
-          userErrors { field message }
-        }
-      }`;
+    const query = `mutation {
+      metaobjectCreate(metaobject: {
+        type: "sidekick_share_click_event"
+        fields: [
+          { key: "platform", value: ${JSON.stringify(platform)} }
+          { key: "product_id", value: ${JSON.stringify(product_id)} }
+          { key: "product_title", value: ${JSON.stringify(product_title || '')} }
+          { key: "timestamp", value: ${JSON.stringify(timestamp || new Date().toISOString())} }
+        ]
+      }) {
+        metaobject { id }
+        userErrors { field message }
+      }
+    }`;
 
     const response = await fetch(`https://${SHOPIFY_STORE}/admin/api/2026-04/graphql.json`, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json', 
-        'X-Shopify-Access-Token': token 
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Access-Token': SHOPIFY_TOKEN
       },
       body: JSON.stringify({ query })
     });
